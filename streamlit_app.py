@@ -44,8 +44,7 @@ def generate_response(user_input):
     return response.text if response else "Sorry, I couldn't generate a response."
 
 # Streamlit UI
-st.title("AI Chatbot (Without Torch/Faiss)")
-
+st.title("Baymax - Your friendly neighbourhood AI")
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
