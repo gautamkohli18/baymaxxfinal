@@ -10,15 +10,13 @@ from sentence_transformers import SentenceTransformer
 
 st.set_page_config(layout="wide", page_title="Baymax - Friendly AI", page_icon="🤖")
 
-# Load Lottie Animation
 def load_lottie_url(url: str):
     response = requests.get(url)
     if response.status_code != 200:
         return None
     return response.json()
 
-# Configure Gemini AI
-api_key = 'YOUR_GOOGLE_API_KEY'
+api_key = 'AIzaSyB3n1FTI2oiL_G7M7WqzdroNcQ-dJiFgyA'
 os.environ["GOOGLE_API_KEY"] = api_key
 genai.configure(api_key=api_key)
 
@@ -35,8 +33,7 @@ model = genai.GenerativeModel(
     generation_config=generation_config,
 )
 
-# Initialize FAISS Vector Store
-vector_dim = 768  # Matching Sentence Transformer dimensions
+vector_dim = 768 
 faiss_index = faiss.IndexFlatL2(vector_dim)
 model_embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
@@ -54,7 +51,6 @@ def load_index():
 
 load_index()
 
-# Sidebar for chat session history
 st.sidebar.title("Chat History")
 if "chat_sessions" not in st.session_state:
     st.session_state.chat_sessions = {}
@@ -74,7 +70,6 @@ if selected_session:
 else:
     chat_history = []
 
-# Typing effect for AI messages
 def typewrite_effect(text):
     placeholder = st.empty()
     typewritten_text = ""
@@ -84,14 +79,12 @@ def typewrite_effect(text):
         time.sleep(0.006)
     placeholder.markdown(f'<div class="ai-message">{text}</div>', unsafe_allow_html=True)
 
-# Retrieve relevant past responses using FAISS
 def retrieve_context(query):
     query_embedding = model_embedder.encode([query])
     D, I = faiss_index.search(query_embedding, k=3)
     retrieved_texts = [chat_history[i]["text"] for i in I[0] if i < len(chat_history)]
     return "\n".join(retrieved_texts)
 
-# Handle user input
 def handle_input():
     user_input = st.session_state.user_input
     if user_input:
@@ -105,7 +98,6 @@ def handle_input():
         save_index()
         st.session_state.user_input = ""
 
-# Display chat history
 for message in chat_history:
     if message["role"] == "user":
         st.markdown(f'<div class="message-box"><div class="user-message">{message["text"]}</div></div>', unsafe_allow_html=True)
