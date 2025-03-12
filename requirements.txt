@@ -1,0 +1,7 @@
+streamlit
+streamlit-lottie
+google-generativeai
+requests
+faiss-cpu
+pickle-mixin
+sentence-transformers
