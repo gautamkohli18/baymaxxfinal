@@ -2,9 +2,6 @@ streamlit
 streamlit-lottie
 google-generativeai
 requests
-faiss-cpu
-pickle-mixin
 sentence-transformers
-torch==2.6.0
-torchvision==0.16.0
-torchaudio==2.1.0
+scikit-learn
+numpy
