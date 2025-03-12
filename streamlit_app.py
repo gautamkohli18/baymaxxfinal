@@ -7,6 +7,13 @@ import time
 import faiss
 import pickle
 from sentence_transformers import SentenceTransformer
+import asyncio
+try:
+    loop = asyncio.get_running_loop()
+except RuntimeError:
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
 
 st.set_page_config(layout="wide", page_title="Baymax - Friendly AI", page_icon="🤖")
 
@@ -94,6 +101,9 @@ def handle_input():
         chat_history.append({"role": "user", "text": user_input})
         chat_history.append({"role": "chatbot", "text": response.text})
         embedding = model_embedder.encode([user_input + response.text])
+        embedding = embedding.reshape(1, -1)  
+        assert embedding.shape[1] == vector_dim, f"Expected {vector_dim}, got {embedding.shape[1]}"
+
         faiss_index.add(embedding)
         save_index()
         st.session_state.user_input = ""
