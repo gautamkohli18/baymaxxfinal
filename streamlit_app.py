@@ -9,7 +9,7 @@ from sklearn.neighbors import NearestNeighbors
 embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
 # Initialize Google Generative AI (Replace with your API key)
-genai.configure(api_key="YOUR_GOOGLE_API_KEY")
+genai.configure(api_key="AIzaSyB3n1FTI2oiL_G7M7WqzdroNcQ-dJiFgyA")
 model = genai.GenerativeModel("gemini-pro")
 
 # In-memory knowledge base (Replace with a database for larger apps)
