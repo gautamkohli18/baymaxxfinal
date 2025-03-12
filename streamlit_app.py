@@ -4,17 +4,10 @@ import google.generativeai as genai
 import os
 import requests
 import time
-import faiss
 import pickle
 import numpy as np
 from sentence_transformers import SentenceTransformer
-import asyncio
-
-try:
-    loop = asyncio.get_running_loop()
-except RuntimeError:
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+from sklearn.metrics.pairwise import cosine_similarity
 
 st.set_page_config(layout="wide", page_title="Baymax - Friendly AI", page_icon="🤖")
 
@@ -24,7 +17,6 @@ def load_lottie_url(url: str):
         return None
     return response.json()
 
-# Configure Google Gemini API
 api_key = 'AIzaSyB3n1FTI2oiL_G7M7WqzdroNcQ-dJiFgyA'
 os.environ["GOOGLE_API_KEY"] = api_key
 genai.configure(api_key=api_key)
@@ -42,29 +34,23 @@ model = genai.GenerativeModel(
     generation_config=generation_config,
 )
 
-# FAISS Index Setup
-vector_dim = 384  # Ensure this matches your embedding model
 model_embedder = SentenceTransformer("all-MiniLM-L6-v2")
+chat_memory = []
 
-# Initialize FAISS index
-faiss_index = faiss.IndexFlatL2(vector_dim)
+def save_memory():
+    with open("chat_memory.pkl", "wb") as f:
+        pickle.dump(chat_memory, f)
 
-def save_index():
-    with open("faiss_store.pkl", "wb") as f:
-        pickle.dump(faiss_index, f)
-
-def load_index():
-    global faiss_index
+def load_memory():
+    global chat_memory
     try:
-        with open("faiss_store.pkl", "rb") as f:
-            faiss_index = pickle.load(f)
-            print(f"Loaded FAISS index with {faiss_index.ntotal} entries.")
-    except (FileNotFoundError, EOFError):
-        print("No previous FAISS index found, initializing a new one.")
+        with open("chat_memory.pkl", "rb") as f:
+            chat_memory = pickle.load(f)
+    except FileNotFoundError:
+        pass
 
-load_index()
+load_memory()
 
-# Sidebar Chat History
 st.sidebar.title("Chat History")
 if "chat_sessions" not in st.session_state:
     st.session_state.chat_sessions = {}
@@ -78,7 +64,11 @@ if st.sidebar.button("New Chat"):
     st.session_state.selected_session = session_id
     selected_session = session_id
 
-chat_history = st.session_state.chat_sessions.get(selected_session, [])
+if selected_session:
+    st.session_state.selected_session = selected_session
+    chat_history = st.session_state.chat_sessions[selected_session]
+else:
+    chat_history = []
 
 def typewrite_effect(text):
     placeholder = st.empty()
@@ -90,50 +80,26 @@ def typewrite_effect(text):
     placeholder.markdown(f'<div class="ai-message">{text}</div>', unsafe_allow_html=True)
 
 def retrieve_context(query):
-    """Retrieve relevant context from FAISS index."""
-    if faiss_index.ntotal == 0:
-        print("FAISS index is empty, returning no context.")
+    if not chat_memory:
         return ""
-
-    query_embedding = model_embedder.encode([query]).astype(np.float32)
-    
-    # Debugging: Check embedding dimensions
-    print(f"Query embedding shape: {query_embedding.shape}")
-    print(f"FAISS index dimension: {faiss_index.d}")
-    
-    if query_embedding.shape[1] != faiss_index.d:
-        print(f"Dimension mismatch! Expected {faiss_index.d}, but got {query_embedding.shape[1]}")
-        return ""
-
-    D, I = faiss_index.search(query_embedding, k=3)
-    retrieved_texts = [chat_history[i]["text"] for i in I[0] if i < len(chat_history)]
-    return "\n".join(retrieved_texts)
+    query_embedding = model_embedder.encode([query])[0].reshape(1, -1)
+    similarities = [cosine_similarity(query_embedding, emb.reshape(1, -1))[0][0] for _, emb in chat_memory]
+    top_indices = np.argsort(similarities)[-3:][::-1]
+    return "\n".join([chat_memory[i][0] for i in top_indices])
 
 def handle_input():
-    """Process user input, generate response, and update FAISS index."""
     user_input = st.session_state.user_input
     if user_input:
         context = retrieve_context(user_input)
         full_prompt = f"Context:\n{context}\n\nUser: {user_input}\nAI:"
         response = model.generate_text(full_prompt)
-
         chat_history.append({"role": "user", "text": user_input})
         chat_history.append({"role": "chatbot", "text": response.text})
-
-        # Encode and store the user query and AI response in FAISS
-        embedding = model_embedder.encode([user_input + response.text]).astype(np.float32)
-        embedding = embedding.reshape(1, -1)
-
-        # Debugging: Ensure dimensions match
-        print(f"New embedding shape: {embedding.shape}, FAISS expected dim: {faiss_index.d}")
-        assert embedding.shape[1] == vector_dim, f"Expected {vector_dim}, but got {embedding.shape[1]}"
-
-        faiss_index.add(embedding)
-        save_index()
-
+        embedding = model_embedder.encode([user_input + response.text])[0]
+        chat_memory.append((user_input + response.text, embedding))
+        save_memory()
         st.session_state.user_input = ""
 
-# Display chat history
 for message in chat_history:
     if message["role"] == "user":
         st.markdown(f'<div class="message-box"><div class="user-message">{message["text"]}</div></div>', unsafe_allow_html=True)
